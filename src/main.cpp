@@ -3,20 +3,15 @@
 #include "RF24.h"
 #include "avr/interrupt.h"
 #include "semphr.h"
-
-typedef struct
-{
-  int16_t sensor_id{0};
-  int16_t sensor_type{0};
-  int16_t value_1{0};
-  int16_t value_2{0};
-  int16_t value_3{0};
-  int16_t value_4{0};
-  int16_t value_5{0};
-} transmitted_data_t;
+#include "EEPROM.h"
+#include "ZHConfig.h"
 
 void sendButtonStatus(void *pvParameters);
 float getBatteryLevelCharge(void);
+void loadConfig(void);
+void saveConfig(void);
+
+int16_t id{abs((int16_t)ID)};
 
 RF24 radio(9, 10);
 SemaphoreHandle_t buttonSemaphore;
@@ -56,13 +51,13 @@ void sendButtonStatus(void *pvParameters)
   for (;;)
   {
     xSemaphoreTake(buttonSemaphore, portMAX_DELAY);
-    transmitted_data_t sensor{abs((int16_t)ID), OPEN_CLOSE};
+    rf_transmitted_data_t sensor{id, RFST_OPEN_CLOSE};
     sensor.value_1 = getBatteryLevelCharge() * 100;
     sensor.value_2 = digitalRead(PD2) ? OPEN : CLOSE; // Normally closed.
     // sensor.value_2 = digitalRead(PD2) ? CLOSE : OPEN; // Normally open.
     radio.powerUp();
     radio.flush_tx();
-    radio.write(&sensor, sizeof(transmitted_data_t));
+    radio.write(&sensor, sizeof(rf_transmitted_data_t));
     radio.powerDown();
     sei();
   }
@@ -80,6 +75,26 @@ float getBatteryLevelCharge()
   ADCSRA &= ~(1 << ADEN);
   float value = ((1024 * 1.1) / (ADCL + ADCH * 256));
   return value;
+}
+
+void loadConfig()
+{
+  cli();
+  if (EEPROM.read(511) == 254)
+    EEPROM.get(0, id);
+  else
+    saveConfig();
+  delay(50);
+  sei();
+}
+
+void saveConfig()
+{
+  cli();
+  EEPROM.write(511, 254);
+  EEPROM.put(0, id);
+  delay(50);
+  sei();
 }
 
 ISR(INT0_vect)
