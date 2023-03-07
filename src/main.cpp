@@ -8,8 +8,7 @@
 
 void sendButtonStatus(void *pvParameters);
 float getBatteryLevelCharge(void);
-void loadConfig(void);
-void saveConfig(void);
+void loadId(void);
 
 int16_t id{abs((int16_t)ID)};
 
@@ -18,6 +17,8 @@ SemaphoreHandle_t buttonSemaphore;
 
 void setup()
 {
+  loadId();
+
   EICRA |= (1 << ISC00);
   EIMSK |= (1 << INT0);
   ADCSRA &= ~(1 << ADEN);
@@ -73,26 +74,19 @@ float getBatteryLevelCharge()
   while (bit_is_set(ADCSRA, ADSC))
     ;
   ADCSRA &= ~(1 << ADEN);
-  float value = ((1024 * 1.1) / (ADCL + ADCH * 256));
-  return value;
+  return (1024 * 1.1) / (ADCL + ADCH * 256);
 }
 
-void loadConfig()
+void loadId()
 {
   cli();
   if (EEPROM.read(511) == 254)
     EEPROM.get(0, id);
   else
-    saveConfig();
-  delay(50);
-  sei();
-}
-
-void saveConfig()
-{
-  cli();
-  EEPROM.write(511, 254);
-  EEPROM.put(0, id);
+  {
+    EEPROM.write(511, 254);
+    EEPROM.put(0, id);
+  }
   delay(50);
   sei();
 }
